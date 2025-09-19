@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Audit Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #fafafa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        .card-header {
+            background: linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D);
+            color: white;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #405DE6, #5851DB);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(45deg, #5851DB, #833AB4);
+        }
+        .result-card {
+            display: none;
+        }
+        .loader {
+            display: none;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #E1306C;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .authenticity-meter {
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            background-color: #f3f3f3;
+            margin: 10px 0;
+        }
+        .authenticity-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fd1d1d, #833ab4, #405de6);
+            transition: width 1s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header text-center py-3">
+                        <h3>Instagram Account Audit Tool</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <strong>Important:</strong> This tool requires your Instagram credentials to perform the audit. 
+                            Your credentials are only used to access the Instagram API and are not stored.
+                        </div>
+                        
+                        <form id="auditForm">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Instagram Username</label>
+                                <input type="text" class="form-control" id="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Instagram Password</label>
+                                <input type="password" class="form-control" id="password" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="targetUsername" class="form-label">Target Username (Optional)</label>
+                                <input type="text" class="form-control" id="targetUsername" placeholder="Leave empty to audit your own account">
+                                <div class="form-text">Enter a different username if you want to audit someone else's account.</div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary py-2">Run Audit</button>
+                            </div>
+                        </form>
+                        
+                        <div class="loader" id="loader"></div>
+                        
+                        <div class="alert alert-danger mt-3" id="errorAlert" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="card result-card" id="resultCard">
+                    <div class="card-header text-center py-3">
+                        <h3>Audit Results</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h4 class="text-center" id="accountName"></h4>
+                                <div class="text-center text-muted mb-3" id="accountStats"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h5>Account Authenticity</h5>
+                                <div class="authenticity-meter">
+                                    <div class="authenticity-fill" id="authenticityFill"></div>
+                                </div>
+                                <div class="text-center" id="authenticityText"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h5>Engagement Analysis</h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <p><strong>Engagement Rate:</strong> <span id="engagementRate"></span></p>
+                                        <p><strong>Posts Analyzed:</strong> <span id="postsAnalyzed"></span></p>
+                                        <div class="progress mt-2" style="height: 20px;">
+                                            <div class="progress-bar bg-info" id="engagementBar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        <div class="text-center mt-2 text-muted"><small>Industry average: 1-3% is considered good</small></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <h5>Detailed Results</h5>
+                                <div id="detailedResults"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('auditForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Show loader and hide any previous errors
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('errorAlert').style.display = 'none';
+            document.getElementById('resultCard').style.display = 'none';
+            
+            // Get form values
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const targetUsername = document.getElementById('targetUsername').value || null;
+            
+            // Call the API
+            fetch('http://localhost:5000/audit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    target_username: targetUsername
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
+                
+                if (!data.success) {
+                    // Show error
+                    document.getElementById('errorAlert').textContent = data.error || 'An error occurred during the audit.';
+                    document.getElementById('errorAlert').style.display = 'block';
+                    return;
+                }
+                
+                // Display results
+                displayResults(data.data);
+            })
+            .catch(error => {
+                // Hide loader and show error
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('errorAlert').textContent = 'Network error: ' + error.message;
+                document.getElementById('errorAlert').style.display = 'block';
+            });
+        });
+        
+        function displayResults(data) {
+            // Show result card
+            document.getElementById('resultCard').style.display = 'block';
+            
+            // Set account info
+            document.getElementById('accountName').textContent = data.username;
+            
+            const userInfo = data.user_info;
+            document.getElementById('accountStats').textContent = 
+                `${userInfo.follower_count} followers · ${userInfo.following_count} following · ${userInfo.media_count} posts`;
+            
+            // Get follower analysis data
+            const followerAnalysis = data.audit.follower_analysis;
+            const authenticity = followerAnalysis.authenticity_percent;
+            
+            // Set authenticity meter
+            document.getElementById('authenticityFill').style.width = `${authenticity}%`;
+            document.getElementById('authenticityText').textContent = 
+                `${authenticity.toFixed(1)}% authentic (${followerAnalysis.fake_followers} fake accounts detected out of ${followerAnalysis.sampled_followers} sampled)`;
+            
+            // Set color based on authenticity
+            if (authenticity < 50) {
+                document.getElementById('authenticityFill').style.background = '#fd1d1d';
+            } else if (authenticity < 80) {
+                document.getElementById('authenticityFill').style.background = 'linear-gradient(90deg, #fd1d1d, #fcb045)';
+            }
+            
+            // Set engagement metrics
+            const engagementAnalysis = data.audit.engagement_analysis;
+            const engagementRate = engagementAnalysis.engagement_rate || 0;
+            document.getElementById('engagementRate').textContent = `${engagementRate.toFixed(2)}%`;
+            document.getElementById('postsAnalyzed').textContent = engagementAnalysis.posts_analyzed || 0;
+            
+            // Set engagement bar (capped at 10% for display purposes)
+            const engagementBarWidth = Math.min(engagementRate * 10, 100); // Scale up to make it visible
+            document.getElementById('engagementBar').style.width = `${engagementBarWidth}%`;
+            document.getElementById('engagementBar').setAttribute('aria-valuenow', engagementBarWidth);
+            
+            // Color the engagement bar based on industry standards
+            if (engagementRate < 1) {
+                document.getElementById('engagementBar').className = 'progress-bar bg-danger';
+            } else if (engagementRate < 3) {
+                document.getElementById('engagementBar').className = 'progress-bar bg-warning';
+            } else {
+                document.getElementById('engagementBar').className = 'progress-bar bg-success';
+            }
+            
+            // Add post analysis if available
+            let postAnalysisHTML = '';
+            if (data.audit.post_analysis) {
+                const postAnalysis = data.audit.post_analysis;
+                postAnalysisHTML = `
+                <div class="card mt-3">
+                    <div class="card-header">Post Likes Analysis</div>
+                    <div class="card-body">
+                        <p><strong>Likes Authenticity:</strong> ${postAnalysis.authenticity_percent.toFixed(1)}%</p>
+                        <p><strong>Fake Likes:</strong> ${postAnalysis.fake_likes} out of ${postAnalysis.sampled_likers} sampled</p>
+                        <div class="progress mt-2" style="height: 20px;">
+                            <div class="progress-bar ${postAnalysis.authenticity_percent < 50 ? 'bg-danger' : postAnalysis.authenticity_percent < 80 ? 'bg-warning' : 'bg-success'}" 
+                                role="progressbar" style="width: ${postAnalysis.authenticity_percent}%" 
+                                aria-valuenow="${postAnalysis.authenticity_percent}" aria-valuemin="0" aria-valuemax="100">
+                                ${postAnalysis.authenticity_percent.toFixed(1)}%
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            // Set detailed results
+            let detailedHTML = `
+                <div class="card mt-3">
+                    <div class="card-header">Account Analysis</div>
+                    <div class="card-body">
+                        <p><strong>Followers Sampled:</strong> ${followerAnalysis.sampled_followers}</p>
+                        <p><strong>Fake Followers Detected:</strong> ${followerAnalysis.fake_followers}</p>
+                        <p><strong>Follower Authenticity:</strong> ${authenticity.toFixed(1)}%</p>
+                        <p><strong>Engagement Rate:</strong> ${engagementRate.toFixed(2)}%</p>
+                        <p><strong>Account Privacy:</strong> ${userInfo.is_private ? 'Private' : 'Public'}</p>
+                    </div>
+                </div>
+                
+                ${postAnalysisHTML}
+                
+                <!-- New section to display fake follower usernames -->
+                <div class="card mt-3">
+                    <div class="card-header">Fake Followers List</div>
+                    <div class="card-body">
+                        <div class="fake-followers-list">
+                            ${followerAnalysis.fake_follower_usernames && followerAnalysis.fake_follower_usernames.length > 0 ? 
+                                `<p><strong>Usernames of Fake Followers:</strong></p>
+                                <ul class="list-group">
+                                    ${followerAnalysis.fake_follower_usernames.map(username => 
+                                        `<li class="list-group-item d-flex justify-content-between align-items-center">
+                                            ${username}
+                                            <a href="https://www.instagram.com/${username}/" target="_blank" class="btn btn-sm btn-outline-primary">View Profile</a>
+                                        </li>`
+                                    ).join('')}
+                                </ul>` : 
+                                '<p>No fake followers detected in the sample.</p>'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <p><strong>What does this mean?</strong></p>
+                    <p>Authenticity below 50% is suspicious and may indicate purchased followers.</p>
+                    <p>Authenticity above 80% suggests a healthy, organic following.</p>
+                    <p>Engagement rates between 1-3% are considered good for accounts with large followings.</p>
+                    <p>This analysis is based on machine learning models trained on Instagram account data.</p>
+                </div>
+            `;
+            
+            document.getElementById('detailedResults').innerHTML = detailedHTML;
+        }
+    </script>
+</body>
+</html>

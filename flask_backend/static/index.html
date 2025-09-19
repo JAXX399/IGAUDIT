@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Audit Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #fafafa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        .card-header {
+            background: linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D);
+            color: white;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #405DE6, #5851DB);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(45deg, #5851DB, #833AB4);
+        }
+        .result-card {
+            display: none;
+        }
+        .loader {
+            display: none;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #E1306C;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .authenticity-meter {
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            background-color: #f3f3f3;
+            margin: 10px 0;
+        }
+        .authenticity-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fd1d1d, #833ab4, #405de6);
+            transition: width 1s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header text-center py-3">
+                        <h3>Instagram Account Audit Tool</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <strong>Important:</strong> This tool requires your Instagram credentials to perform the audit. 
+                            Your credentials are only used to access the Instagram API and are not stored.
+                        </div>
+                        
+                        <form id="auditForm">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Instagram Username</label>
+                                <input type="text" class="form-control" id="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Instagram Password</label>
+                                <input type="password" class="form-control" id="password" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="targetUsername" class="form-label">Target Username (Optional)</label>
+                                <input type="text" class="form-control" id="targetUsername" placeholder="Leave empty to audit your own account">
+                                <div class="form-text">Enter a different username if you want to audit someone else's account.</div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary py-2">Run Audit</button>
+                            </div>
+                        </form>
+                        
+                        <div class="loader" id="loader"></div>
+                        
+                        <div class="alert alert-danger mt-3" id="errorAlert" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="card result-card" id="resultCard">
+                    <div class="card-header text-center py-3">
+                        <h3>Audit Results</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h4 class="text-center" id="accountName"></h4>
+                                <div class="text-center text-muted mb-3" id="accountStats"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h5>Account Authenticity</h5>
+                                <div class="authenticity-meter">
+                                    <div class="authenticity-fill" id="authenticityFill"></div>
+                                </div>
+                                <div class="text-center" id="authenticityText"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <h5>Detailed Results</h5>
+                                <div id="detailedResults"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('auditForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Show loader and hide any previous errors
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('errorAlert').style.display = 'none';
+            document.getElementById('resultCard').style.display = 'none';
+            
+            // Get form values
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const targetUsername = document.getElementById('targetUsername').value || null;
+            
+            // Call the API
+            fetch('http://localhost:5000/audit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    target_username: targetUsername
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
+                
+                if (!data.success) {
+                    // Show error
+                    document.getElementById('errorAlert').textContent = data.error || 'An error occurred during the audit.';
+                    document.getElementById('errorAlert').style.display = 'block';
+                    return;
+                }
+                
+                // Display results
+                displayResults(data.data);
+            })
+            .catch(error => {
+                // Hide loader and show error
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('errorAlert').textContent = 'Network error: ' + error.message;
+                document.getElementById('errorAlert').style.display = 'block';
+            });
+        });
+        
+        function displayResults(data) {
+            // Show result card
+            document.getElementById('resultCard').style.display = 'block';
+            
+            // Set account info
+            document.getElementById('accountName').textContent = data.username;
+            
+            const userInfo = data.user_info;
+            document.getElementById('accountStats').textContent = 
+                `${userInfo.follower_count} followers · ${userInfo.following_count} following · ${userInfo.media_count} posts`;
+            
+            // Set authenticity meter
+            const authenticity = data.audit.authenticity_percent;
+            document.getElementById('authenticityFill').style.width = `${authenticity}%`;
+            document.getElementById('authenticityText').textContent = 
+                `${authenticity.toFixed(1)}% authentic (${data.audit.no_fakes} fake accounts detected out of ${data.audit.sampled_followers} sampled)`;
+            
+            // Set color based on authenticity
+            if (authenticity < 50) {
+                document.getElementById('authenticityFill').style.background = '#fd1d1d';
+            } else if (authenticity < 80) {
+                document.getElementById('authenticityFill').style.background = 'linear-gradient(90deg, #fd1d1d, #fcb045)';
+            }
+            
+            // Set detailed results
+            let detailedHTML = `
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <p><strong>Followers Sampled:</strong> ${data.audit.sampled_followers}</p>
+                        <p><strong>Fake Accounts Detected:</strong> ${data.audit.no_fakes}</p>
+                        <p><strong>Authenticity Score:</strong> ${authenticity.toFixed(1)}%</p>
+                        <p><strong>Account Privacy:</strong> ${userInfo.is_private ? 'Private' : 'Public'}</p>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <p><strong>What does this mean?</strong></p>
+                    <p>Authenticity below 50% is suspicious and may indicate purchased followers.</p>
+                    <p>Authenticity above 80% suggests a healthy, organic following.</p>
+                    <p>This analysis is based on a random sample of followers and statistical patterns.</p>
+                </div>
+            `;
+            
+            document.getElementById('detailedResults').innerHTML = detailedHTML;
+        }
+    </script>
+</body>
+</html>

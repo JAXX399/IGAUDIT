@@ -1,0 +1,6 @@
+flask
+playwright
+pandas
+numpy
+scikit-learn
+instagram-private-api
